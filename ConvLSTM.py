@@ -5,6 +5,16 @@ import torch
 class ConvLSTMCell(nn.Module):
 
     def __init__(self, in_channels, h_channels, kernel_size, device):
+        '''
+        Parameters
+        -----------
+        in_channels: int
+            Number of channels of input tensor
+        h_channels: int
+            Number of channels of hidden state
+        kernel size: (int, int)
+            Size of convolutional kernel  
+        '''
         super(ConvLSTMCell, self).__init__()
 
         self.h_channels = h_channels
@@ -42,13 +52,19 @@ class ConvLSTMCell(nn.Module):
     
 class ConvLSTM(nn.Module):
     
-    def __init__(
-        self, 
-        in_channels, 
-        h_channels, 
-        num_layers,
-        kernel_size, 
-        device):
+    def __init__(self, in_channels, h_channels, num_layers, kernel_size, device):
+        '''
+        Parameters
+        -----------
+        in_channels: int
+            Number of channels of input tensor
+        h_channels: int
+            Number of channels of hidden state
+        num_layers: int
+            Number of LSTM layers stacked on each other
+        kernel_size: (int, int)
+            Size of kernel in convolutions
+        '''
         
         super(ConvLSTM, self).__init__()
         
@@ -66,21 +82,43 @@ class ConvLSTM(nn.Module):
         self.layer_list = nn.ModuleList(layer_list)
             
     def forward(self, x, states=None):
+        # (t, b, c, h, w) -> (b, t, c, h, w)
+        x = x.permute(1, 0, 2, 3, 4)
+        b,_,_,h,w = x.size()
                     
         if states is None:
-            hidden_states, cell_states = self.init_hidden() 
+            hidden_states = self.init_hidden(batch_size=b, image_size=(h,w))
         else:
             hidden_states, cell_states = states
         
+        layer_output_list = []
+        last_state_list = []
+        cur_layer_input = x
         for i, layer in enumerate(self.layer_list):
-            pass
             # [TODO: layer forward]
-                 
-        return hidden_states, (hidden_states, cell_states)
+            h = hidden_states[i]
+            c = cell_states[i]
+
+            output_inner = []
+            for t in range(x.size(1)):
+                h,c = layer(input_data=cur_layer_input[:,t,:,:,:], prev_state = [h,c])
+                output_inner.append(h)
+            
+            layer_output = torch.stack(output_inner, dim=1)
+            cur_layer_input = layer_output
+
+            layer_output_list.append(layer_output)
+            last_state_list.append([h,c])
+
+        return layer_output_list[-1], last_state_list[-1]   
+        # return hidden_states, (hidden_states, cell_states)
     
     def init_hidden(self, batch_size, image_size):
-        pass
         # [TODO: initialze hidden and cell states]
+        hidden_states = []
+        for i in range(self.num_layer):
+            hidden_states.append(self.layer_list[i].init_hidden(batch_size, image_size))
+        return hidden_states
         
     
 def activation_factory(name):
@@ -186,8 +224,9 @@ class Seq2Seq(nn.Module):
         
         # encoder
         for t in range(self.seq_len - 1):
-            pass
+            # pass
             # [TODO: call ConvLSTM]
+            h_t, c_t = self.frame_encoder()
         
         # decoder
         for t in range(self.horizon):
@@ -195,6 +234,8 @@ class Seq2Seq(nn.Module):
             if teacher_forcing_rate is None:
                 pass
                 # [TODO: use predicted frames as the input]
+            
+            
             else:
                 pass
                 # [TODO: choose from predicted frames and out_seq as the input
@@ -203,7 +244,7 @@ class Seq2Seq(nn.Module):
             # [TODO: call ConvLSTM]
             pass
             
-            # out = self.frame_decoder(hidden_states[-1])
+            out = self.frame_decoder(hidden_states[-1])
             next_frames.append(out)
         
         next_frames = torch.stack(next_frames, dim=1) 
