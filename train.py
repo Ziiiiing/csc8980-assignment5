@@ -10,6 +10,8 @@ from torch.utils.data import DataLoader
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
+from ConvLSTM import ConvLSTM
+
 
 def train(args):
     
@@ -37,6 +39,11 @@ def train(args):
     
     # [TODO: define your model, optimizer, loss function]
     writer = SummaryWriter()  # initialize tensorboard writer
+    
+    device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    model = ConvLSTM(in_channels=xxx, h_channels=xxx, num_layers=xxx, kernel_size=xxx, device=device)
+    optimizer = optim.SGD(model.parameters, lr=0.01, momentum=0.9)
+    loss_func = nn.CrossEntropyLoss()
     
     if args.use_teacher_forcing:
         teacher_forcing_rate = 1.0
