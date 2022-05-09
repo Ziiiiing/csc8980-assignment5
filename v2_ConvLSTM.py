@@ -204,7 +204,7 @@ class DCGAN64Decoder(nn.Module):
     
 class Seq2Seq(nn.Module):
     
-    def __init__(self, in_channels=1,h_channels=64, num_layers, kernel_size, seq_len, horizon):
+    def __init__(self, num_layers, kernel_size, seq_len, horizon, in_channels=1, h_channels=64,):
         
         super(Seq2Seq, self).__init__()
                 
