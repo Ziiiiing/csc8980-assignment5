@@ -13,12 +13,15 @@ class ConvLSTMCell(nn.Module):
                               out_channels=4 * h_channels,
                               kernel_size=kernel_size,
                               padding=padding,
-                              bias=True)
+                              bias=True,
+                              device = device)
         self.device = device
     
     def forward(self, input_data, prev_state):
-        h_prev, c_prev = prev_state
-        combined = torch.cat((input_data, h_prev), dim=1)  # concatenate along channel axis
+        h_prev, c_prev = prev_state 
+        
+        combined = torch.cat((input_data, h_prev), dim=1)  # concatenate along channel axis  
+        # combined is cuda
 
         combined_output = self.conv(combined)
         cc_i, cc_f, cc_o, cc_g = torch.split(combined_output, self.h_channels, dim=1)
@@ -58,27 +61,71 @@ class ConvLSTM(nn.Module):
         layer_list = []
         for i in range(num_layers):
             cur_in_channels = in_channels if i == 0 else h_channels[i - 1]
-            layer_list.append(ConvLSTMCell(in_channels=cur_in_channels,
-                                           h_channels=h_channels[i],
+            layer_list.append(ConvLSTMCell(in_channels=cur_in_channels,    # ???
+                                           h_channels=h_channels[i],       # ???
                                            kernel_size=kernel_size,
                                            device=device))
             
         self.layer_list = nn.ModuleList(layer_list)
             
     def forward(self, x, states=None):
+
+        # input tensor(single frame) is [b,c,h,w] 
+        batchsize,_,height,width = x.size() 
                     
         if states is None:
-            hidden_states, cell_states = self.init_hidden() 
+            hidden_states, cell_states = self.init_hidden(batch_size=batchsize, image_size=(height, width))  
         else:
             hidden_states, cell_states = states
         
+        current_input = x
+        next_hidden_states = []   # for all convlstm layers
+        next_cell_states = []     # for all convlstm layers
+        
         for i, layer in enumerate(self.layer_list):
-            # [TODO: layer forward]
-                 
-        return hidden_states, (hidden_states, cell_states)
+            # [TODO: layer forward] 
+
+            # update hidden state & cell state for this layer
+            hidden_state_this_layer = hidden_states[i]
+            cell_state_this_layer = cell_states[i]
+            state_this_layer = (hidden_state_this_layer, cell_state_this_layer)
+            hidden_state_this_layer, cell_state_this_layer = layer(input_data=current_input, prev_state=state_this_layer)   
+
+
+            # store updated hidden state and cell state for all layers
+            next_hidden_states.append(hidden_state_this_layer)
+            next_cell_states.append(cell_state_this_layer)
+
+            # update the input for next forward
+            # rest layers take the hidden state of the previous layer as input
+            current_input = hidden_state_this_layer   # torch.Size([16, 64, 16, 16]
+            
+            
+
+        # hidden_states -> list of hidden state for each conv layer, 
+        # (hidden_states, cell_states) -> tuple of list of state(h,c) for each layer       
+        return next_hidden_states, (next_hidden_states, next_cell_states)  
+
+        # return last convlstm layer only
+        # return next_hidden_states[-1], (next_hidden_states[-1], next_cell_states[-1])
+        
     
     def init_hidden(self, batch_size, image_size):
-        # [TODO: initialze hidden and cell states]
+        # [TODO: initialze hidden and cell states]   
+        # initialize all layers' hidden states and cell states as zeros
+
+        hidden_states = []
+        cell_states = []
+        for layer in self.layer_list:
+            hidden_state_cur_layer, cell_state_cur_layer = layer.init_hidden(batch_size, image_size)
+            hidden_states.append(hidden_state_cur_layer)
+            cell_states.append(cell_state_cur_layer)
+
+        return hidden_states, cell_states
+
+
+
+
         
     
 def activation_factory(name):
@@ -181,24 +228,43 @@ class Seq2Seq(nn.Module):
          
         next_frames = []
         hidden_states, states = None, None
+
+        # in_seq is a 5d tensor like [b,seq_len,c,h,w]
+        # change this into [seq_len, b,c,h,w]
+        in_seq = in_seq.permute(1,0,2,3,4)
+
+        # prepare the ground truth for teacher forcing
+        out_seq = out_seq.permute(1,0,2,3,4)  # [t,b,c,h,w]
         
         # encoder
-        for t in range(self.seq_len - 1):
+        for t in range(self.seq_len): 
             # [TODO: call ConvLSTM]
-        
+
+            in_frame = in_seq[t]
+            # perform frame encoder to increase channel but decrease frame size (for faster training)
+            in_frame = self.frame_encoder(in_frame)   # 4d tensor [b,c,h,w]
+      
+            # call ConvLSTM
+            hidden_states,states = self.model(in_frame, states)
+
         # decoder
         for t in range(self.horizon):
             
             if teacher_forcing_rate is None:
                 # [TODO: use predicted frames as the input]
+                input = hidden_states[-1]
             else:
                 # [TODO: choose from predicted frames and out_seq as the input
-                # [      based on teacher forcing rate]
-                
+                # [ based on teacher forcing rate]   
+                target_frame = out_seq[t-1] if t >0 else hidden_states[-1]
+                target_frame = self.frame_encoder(target_frame)
+                input = target_frame
+
             # [TODO: call ConvLSTM]
-            
-            # out = self.frame_decoder(hidden_states[-1])
-            next_frames.append(out)
+            hidden_states, states = self.model(input, states) 
+
+            out = self.frame_decoder(hidden_states[-1])
+            next_frames.append(out)      
         
         next_frames = torch.stack(next_frames, dim=1) 
         return next_frames
