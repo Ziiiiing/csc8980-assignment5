@@ -209,7 +209,8 @@ class Seq2Seq(nn.Module):
         super(Seq2Seq, self).__init__()
                 
         self.in_channels = in_channels
-        self.h_channels = h_channels    
+        self.h_channels = h_channels
+        self.out_channels = in_channels  
         self.num_layers = num_layers
         self.kernel_size = kernel_size
                 
