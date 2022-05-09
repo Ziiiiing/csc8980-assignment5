@@ -204,7 +204,7 @@ class DCGAN64Decoder(nn.Module):
     
 class Seq2Seq(nn.Module):
     
-    def __init__(self, num_layers, kernel_size, seq_len, horizon, in_channels=1, h_channels=64,):
+    def __init__(self, num_layers, kernel_size, seq_len, horizon, device, in_channels=1, h_channels=64,):
         
         super(Seq2Seq, self).__init__()
                 
@@ -215,15 +215,17 @@ class Seq2Seq(nn.Module):
                 
         self.seq_len = seq_len
         self.horizon = horizon
+
+        self.device = device
         
-        self.frame_encoder = DCGAN64Encoder(self.in_channels, self.h_channels).to(self.gpu) 
-        self.frame_decoder = DCGAN64Decoder(self.h_channels, self.out_channels).to(self.gpu)
+        self.frame_encoder = DCGAN64Encoder(self.in_channels, self.h_channels).to(self.device) 
+        self.frame_decoder = DCGAN64Decoder(self.h_channels, self.out_channels).to(self.device)
 
         self.model = ConvLSTM(in_channels=self.h_channels, 
                               h_channels=[self.h_channels] * self.num_layers, 
                               num_layers=self.num_layers, 
                               kernel_size=self.kernel_size,
-                              device=self.gpu)
+                              device=self.device)
                     
     def forward(self, in_seq, out_seq, teacher_forcing_rate=None):
          
