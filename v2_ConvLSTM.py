@@ -204,16 +204,16 @@ class DCGAN64Decoder(nn.Module):
     
 class Seq2Seq(nn.Module):
     
-    def __init__(self, args):
+    def __init__(self, h_channels, num_layers, kernel_size, seq_len, horizon):
         
         super(Seq2Seq, self).__init__()
                 
-        self.h_channels = args.h_channels
-        self.num_layers = args.num_layers
-        self.kernel_size = args.kernel_size
+        self.h_channels = h_channels
+        self.num_layers = num_layers
+        self.kernel_size = kernel_size
                 
-        self.seq_len = args.seq_len
-        self.horizon = args.horizon
+        self.seq_len = seq_len
+        self.horizon = horizon
         
         self.frame_encoder = DCGAN64Encoder(self.in_channels, self.h_channels).to(self.gpu) 
         self.frame_decoder = DCGAN64Decoder(self.h_channels, self.out_channels).to(self.gpu)
