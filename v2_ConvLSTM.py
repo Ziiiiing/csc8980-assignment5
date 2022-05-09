@@ -204,11 +204,12 @@ class DCGAN64Decoder(nn.Module):
     
 class Seq2Seq(nn.Module):
     
-    def __init__(self, h_channels, num_layers, kernel_size, seq_len, horizon):
+    def __init__(self, in_channels=1,h_channels=64, num_layers, kernel_size, seq_len, horizon):
         
         super(Seq2Seq, self).__init__()
                 
-        self.h_channels = h_channels
+        self.in_channels = in_channels
+        self.h_channels = h_channels    
         self.num_layers = num_layers
         self.kernel_size = kernel_size
                 
